@@ -16,13 +16,15 @@ namespace EcsSample
         {
 
             var entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
+            // Add entity achetype
             var entityArchetype = entityManager.CreateArchetype(
                 typeof(MoveSpeedComponent),
                 typeof(Translation),
                 typeof(RenderMesh),
                 typeof(LocalToWorld),
                 typeof(RenderBounds));
-            var entityArray = new NativeArray<Entity>(500000, Allocator.Temp);
+            var entityArray = new NativeArray<Entity>(50000, Allocator.Temp);
+            // Instantiate entities
             entityManager.CreateEntity(entityArchetype, entityArray);
             for (int i = 0; i < entityArray.Length; i++)
             {
