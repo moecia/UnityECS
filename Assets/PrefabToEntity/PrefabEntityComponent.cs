@@ -1,7 +1,10 @@
 using Unity.Entities;
 
-[GenerateAuthoringComponent]
-public struct PrefabEntityComponent : IComponentData
+namespace PrefabToEntity
 {
-    public Entity PrefabEntity;
+    public struct PrefabEntityComponent : IComponentData
+    {
+        public Entity PrefabEntity;
+        public int Count;
+    }
 }
