@@ -1,5 +1,8 @@
+using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 
@@ -7,23 +10,29 @@ namespace Boid.ECS
 {
     public class BoidSystem : SystemBase
     {
-        private struct EntityWithLocalToWorld
+        [BurstCompile]
+        private struct CalcutateForce : IJobParallelFor
         {
-            public Entity entity;
-            public LocalToWorld localToWorld;
-        }
+            //[DeallocateOnJobCompletion]
+            [NativeDisableParallelForRestriction]
+            [ReadOnly]
+            public NativeArray<EntityWithLocalToWorld> BoidsArray;
+            [ReadOnly]
+            public float deltaTime;
+            [ReadOnly]
+            public Boid Boid;
 
-        protected override void OnUpdate()
-        {
-            var dt = Time.DeltaTime;
-            var boidsQuery = GetEntityQuery(ComponentType.ReadOnly<Boid>(), ComponentType.ReadOnly<LocalToWorld>());
-            var entityArray = boidsQuery.ToEntityArray(Allocator.TempJob);
-            var localToWorldArray = boidsQuery.ToComponentDataArray<LocalToWorld>(Allocator.TempJob);
+            [NativeDisableContainerSafetyRestriction]
+            [WriteOnly]
+            public ComponentDataFromEntity<Translation> TranslationFromEntity;
+            [NativeDisableContainerSafetyRestriction]
+            [WriteOnly]
+            public ComponentDataFromEntity<Rotation> RotationFromEntity;
 
-            var jobHandle = Entities.
-                ForEach((Entity entity, ref Translation translation, ref Rotation rotation, in LocalToWorld localToWorld, in Boid boid) =>
+            public void Execute(int index)
             {
-                var boidPosition = localToWorld.Position;
+                var entity = BoidsArray[index].Entity;
+                var boidPosition = BoidsArray[index].LocalToWorld.Position;
 
                 var seperationSum = float3.zero;
                 var positionSum = float3.zero;
@@ -31,18 +40,18 @@ namespace Boid.ECS
 
                 int boidsNearby = 0;
 
-                for (int i = 0; i < entityArray.Length; i++)
+                for (int i = 0; i < BoidsArray.Length; i++)
                 {
-                    if (entity != entityArray[i])
+                    if (entity != BoidsArray[i].Entity)
                     {
-                        var otherBoidsPosition = localToWorldArray[i].Position;
+                        var otherBoidsPosition = BoidsArray[i].LocalToWorld.Position;
                         var distToOtherBoid = math.length(boidPosition - otherBoidsPosition);
 
-                        if (distToOtherBoid < boid.CellRadius)
+                        if (distToOtherBoid < Boid.CellRadius)
                         {
                             seperationSum += -(otherBoidsPosition - boidPosition) * (1f / math.max(distToOtherBoid, .0001f));
                             positionSum += otherBoidsPosition;
-                            headingSum += localToWorldArray[i].Forward;
+                            headingSum += BoidsArray[i].LocalToWorld.Forward;
                             boidsNearby++;
                         }
                     }
@@ -58,27 +67,78 @@ namespace Boid.ECS
                     cohesionForce = (positionSum / boidsNearby) - boidPosition;
                     alignmentForce = headingSum / boidsNearby;
                 }
-                var force = separationForce * boid.SeparationWeight +
-                        cohesionForce * boid.CohesionWeight +
-                        alignmentForce * boid.AlighmentWeight;
-                if (math.min(math.min((500f / 2f) - math.abs(boidPosition.x),
-                      (500f / 2f) - math.abs(boidPosition.y)),
-                      (500f / 2f) - math.abs(boidPosition.z)) < boid.AvoidWallTurnDistance)
+                if (math.min(math.min((500 / 2f) - math.abs(boidPosition.x),
+                                      (500 / 2f) - math.abs(boidPosition.y)),
+                                      (500 / 2f) - math.abs(boidPosition.z)) < Boid.AvoidWallTurnDistance)
                 {
-                    force += math.normalize(boidPosition) * boid.AvoidWallsWeight * -1f;
+                    avoidWallsForce = -math.normalize(boidPosition);
                 }
 
-                var velocity = localToWorld.Forward * boid.MoveSpeed;
-                velocity += force * dt;
-                velocity = math.normalize(velocity) * boid.MoveSpeed;
+                var force = separationForce * Boid.SeparationWeight +
+                        cohesionForce * Boid.CohesionWeight +
+                        alignmentForce * Boid.AlighmentWeight +
+                        avoidWallsForce * Boid.AvoidWallsWeight;
+                var velocity = BoidsArray[index].LocalToWorld.Forward * Boid.MoveSpeed;
+                velocity += force * deltaTime;
+                velocity = math.normalize(velocity) * Boid.MoveSpeed;
 
-                translation.Value = localToWorld.Position + velocity * dt;
-                rotation.Value = quaternion.LookRotationSafe(velocity, localToWorld.Up);
-            }).Schedule(Dependency);
 
-            Dependency = jobHandle;
-            entityArray.Dispose(Dependency);
-            localToWorldArray.Dispose(Dependency);
+                var translation = new Translation { Value = BoidsArray[index].LocalToWorld.Position + velocity * deltaTime };
+                var rotation = new Rotation { Value = quaternion.LookRotationSafe(velocity, BoidsArray[index].LocalToWorld.Up) };
+                TranslationFromEntity[entity] = translation;
+                RotationFromEntity[entity] = rotation;
+            }
+        }
+
+        private struct EntityWithLocalToWorld
+        {
+            public Entity Entity;
+            public LocalToWorld LocalToWorld;
+        }
+
+
+        protected override void OnUpdate()
+        {
+            var dt = Time.DeltaTime;
+            var boidsQuery = GetEntityQuery(ComponentType.ReadOnly<Boid>(), ComponentType.ReadOnly<LocalToWorld>());
+            var entitiesArray = boidsQuery.ToEntityArray(Allocator.TempJob);
+            var localToWorldArray = boidsQuery.ToComponentDataArray<LocalToWorld>(Allocator.TempJob);
+            var boidsArray = new NativeArray<EntityWithLocalToWorld>(entitiesArray.Length, Allocator.TempJob);
+            for (int i = 0; i < entitiesArray.Length; i++)
+            {
+                boidsArray[i] = new EntityWithLocalToWorld
+                {
+                    Entity = entitiesArray[i],
+                    LocalToWorld = localToWorldArray[i]
+                };
+            }
+            entitiesArray.Dispose();
+            localToWorldArray.Dispose();
+
+            Entities
+                .WithStructuralChanges()
+                .WithName("BoidSystem")
+                .ForEach((Boid boid) =>
+                {
+
+                    var translationFromEntity = GetComponentDataFromEntity<Translation>();
+                    var rotationFromEntity = GetComponentDataFromEntity<Rotation>();
+
+                    var calcutateForceJob = new CalcutateForce
+                    {
+                        TranslationFromEntity = translationFromEntity,
+                        RotationFromEntity = rotationFromEntity,
+                        Boid = boid,
+                        BoidsArray = boidsArray,
+                        deltaTime = dt
+                    };
+                    calcutateForceJob.Schedule(boidsArray.Length, 64, Dependency).Complete();
+                    if (boidsArray.Length > 0)
+                    {
+                        boidsArray.Dispose();
+                    }
+                }).Run();
+
         }
     }
 }
