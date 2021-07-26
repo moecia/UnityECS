@@ -6,57 +6,56 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-namespace PrefabToEntity
+namespace Boid.ECS
 {
-    public class EntitiesSpawnerSystem : SystemBase
+    public class BoidSpawnSystem : SystemBase
     {
         [BurstCompile]
-        private struct SetPosition : IJobParallelFor
+        private struct SetBoidPosition : IJobParallelFor
         {
             [NativeDisableContainerSafetyRestriction]
             [NativeDisableParallelForRestriction]
             public ComponentDataFromEntity<Translation> TranslationFromEntity;
+
             public NativeArray<Entity> Entites;
+            public int CageSize;
 
             public void Execute(int index)
             {
                 var entity = Entites[index];
                 var random = new Random(((uint)(entity.Index + index + 1) * 0x9F6ABC1));
-                var translation = new Translation { Value = new float3(random.NextFloat(-5f, 5f), random.NextFloat(-5f, 5f), 0) };
+                var translation = new Translation
+                {
+                    Value = new float3(random.NextFloat(-CageSize / 2, CageSize / 2),
+                                       random.NextFloat(-CageSize / 2, CageSize / 2),
+                                       random.NextFloat(-CageSize / 2, CageSize / 2))
+                };
                 TranslationFromEntity[entity] = translation;
             }
         }
 
         protected override void OnUpdate()
         {
-            // What is structural changes: https://docs.unity3d.com/Packages/com.unity.entities@0.4/manual/sync_points.html
             Entities
                 .WithStructuralChanges()
                 .WithName("EntitiesSpawnerSystem")
-                .ForEach((Entity entity, in PrefabEntityComponent prefabEntityComponent) =>
+                .ForEach((Entity entity, in BoidPrefabComponent boidPrefabEntity) =>
                 {
-                    var entities = new NativeArray<Entity>(prefabEntityComponent.Count, Allocator.TempJob);
-                    EntityManager.Instantiate(prefabEntityComponent.PrefabEntity, entities);
-
-                    // Nested job
-                    //Entities.ForEach((ref Translation translation) =>
-                    //{
-                    //    translation.Value.x = random.NextFloat(-5f, 5f);
-                    //    translation.Value.y = random.NextFloat(-5f, 5f);
-                    //}).WithoutBurst().Run();
+                    var entities = new NativeArray<Entity>(boidPrefabEntity.Count, Allocator.TempJob);
+                    EntityManager.Instantiate(boidPrefabEntity.BoidPrefab, entities);
 
                     // Use Job
                     var translationFromEntity = GetComponentDataFromEntity<Translation>();
-                    var setBoidPositionJob = new SetPosition
+                    var setBoidPositionJob = new SetBoidPosition
                     {
                         TranslationFromEntity = translationFromEntity,
-                        Entites = entities
+                        Entites = entities,
+                        CageSize = boidPrefabEntity.CageSize
                     };
-                    Dependency = setBoidPositionJob.Schedule(prefabEntityComponent.Count, 64, Dependency);
+                    Dependency = setBoidPositionJob.Schedule(boidPrefabEntity.Count, 64, Dependency);
                     Dependency = entities.Dispose(Dependency);
 
                     EntityManager.DestroyEntity(entity);
-                    //entities.Dispose();
                 }).Run();
         }
     }
