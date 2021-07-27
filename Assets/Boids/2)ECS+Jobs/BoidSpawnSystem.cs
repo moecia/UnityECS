@@ -16,6 +16,9 @@ namespace Boid.ECS
             [NativeDisableContainerSafetyRestriction]
             [NativeDisableParallelForRestriction]
             public ComponentDataFromEntity<Translation> TranslationFromEntity;
+            [NativeDisableContainerSafetyRestriction]
+            [NativeDisableParallelForRestriction]
+            public ComponentDataFromEntity<Rotation> RotationFromEntity;
 
             public NativeArray<Entity> Entites;
             public int CageSize;
@@ -30,7 +33,9 @@ namespace Boid.ECS
                                        random.NextFloat(-CageSize / 2, CageSize / 2),
                                        random.NextFloat(-CageSize / 2, CageSize / 2))
                 };
+                var rotation = new Rotation { Value = quaternion.LookRotationSafe(math.normalizesafe(random.NextFloat3()), math.up()) };
                 TranslationFromEntity[entity] = translation;
+                RotationFromEntity[entity] = rotation;
             }
         }
 
@@ -46,9 +51,12 @@ namespace Boid.ECS
 
                     // Use Job
                     var translationFromEntity = GetComponentDataFromEntity<Translation>();
+                    var rotationFromEntity = GetComponentDataFromEntity<Rotation>();
+
                     var setBoidPositionJob = new SetBoidPosition
                     {
                         TranslationFromEntity = translationFromEntity,
+                        RotationFromEntity = rotationFromEntity,
                         Entites = entities,
                         CageSize = boidPrefabEntity.CageSize
                     };
