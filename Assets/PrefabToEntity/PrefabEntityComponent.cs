@@ -6,5 +6,12 @@ namespace PrefabToEntity
     {
         public Entity PrefabEntity;
         public int Count;
+        public SpawnAxis SpawnAxis;
+    }
+
+    public enum SpawnAxis
+    {
+        Y = 0,
+        Z
     }
 }

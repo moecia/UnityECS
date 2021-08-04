@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Transforms;
 
 namespace EcsSample
@@ -11,9 +12,13 @@ namespace EcsSample
             Entities.ForEach((ref Translation translation, ref MoveSpeedComponent moveSpeedComponent) =>
             {
                 translation.Value.y += moveSpeedComponent.MoveSpeed * dt;
-                if (translation.Value.y > 5f || translation.Value.y < -5f)
+                if (translation.Value.y > 5f)
                 {
-                    moveSpeedComponent.MoveSpeed *= -1;
+                    moveSpeedComponent.MoveSpeed = -math.abs(moveSpeedComponent.MoveSpeed);
+                }
+                else if (translation.Value.y < -5f)
+                {
+                    moveSpeedComponent.MoveSpeed = math.abs(moveSpeedComponent.MoveSpeed);
                 }
             }).ScheduleParallel();
         }

@@ -8,6 +8,8 @@ namespace PrefabToEntity
     {
         public GameObject Prefab;
         public int Count;
+        public SpawnAxis SpawnAxis;
+
         public void DeclareReferencedPrefabs(List<GameObject> referencedPrefabs)
         {
             referencedPrefabs.Add(Prefab);
@@ -18,7 +20,8 @@ namespace PrefabToEntity
             var spawnerData = new PrefabEntityComponent
             {
                 PrefabEntity = conversionSystem.GetPrimaryEntity(Prefab),
-                Count = Count
+                Count = Count,
+                SpawnAxis = SpawnAxis
             };
             dstManager.AddComponentData(entity, spawnerData);
         }

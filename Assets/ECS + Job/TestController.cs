@@ -12,6 +12,7 @@ namespace EcsSample
     {
         [SerializeField] private Mesh mesh;
         [SerializeField] private Material material;
+        [SerializeField] private int count = 1000;
         void Start()
         {
 
@@ -23,7 +24,7 @@ namespace EcsSample
                 typeof(RenderMesh),
                 typeof(LocalToWorld),
                 typeof(RenderBounds));
-            var entityArray = new NativeArray<Entity>(50000, Allocator.Temp);
+            var entityArray = new NativeArray<Entity>(count, Allocator.Temp);
             // Instantiate entities
             entityManager.CreateEntity(entityArchetype, entityArray);
             for (int i = 0; i < entityArray.Length; i++)
