@@ -26,11 +26,11 @@ namespace PrefabToEntity
                 var entity = Entites[index];
                 var random = new Random(((uint)(entity.Index + index + 1) * 0x9F6ABC1));
                 var translation = new Translation { };
-                if (SpawnAxis == SpawnAxis.Y)
+                if (SpawnAxis == SpawnAxis.XY)
                 {
                     translation = new Translation { Value = new float3(random.NextFloat(-5f, 5f), random.NextFloat(-5f, 5f), 0) };
                 }
-                else if (SpawnAxis == SpawnAxis.Z)
+                else if (SpawnAxis == SpawnAxis.XZ)
                 {
                     translation = new Translation { Value = new float3(random.NextFloat(-10f, 10f), 1.1f, random.NextFloat(-10f, 10f)) };
                 }

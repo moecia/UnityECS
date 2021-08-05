@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
@@ -10,10 +9,9 @@ using UnityEngine;
 
 namespace UnitControl
 {
-    public class UnityControlSystem : SystemBase
+    public class UnitControlSystem : SystemBase
     {
         private float3 startPosition;
-
         protected override void OnUpdate()
         {
             if (Input.GetMouseButtonDown(0))
@@ -67,11 +65,12 @@ namespace UnitControl
                     ecb.RemoveComponent<WorldRenderBounds>(entity);
                 }).Run();
 
+
                 Entities
-                    .WithEntityQueryOptions(EntityQueryOptions.IncludeDisabled)
-                    .ForEach((Entity entity, ref LocalToWorld localToWorld) =>
+                    .WithAll<MoveComponent>()
+                    .ForEach((Entity entity, in LocalToWorld localToWorld) =>
                     {
-                        if (singleSelect == false || selectEntitiesCount < 2)
+                        if (singleSelect == false || selectEntitiesCount < 1)
                         {
                             var pos = localToWorld.Value.c3;
                             if (pos.x >= lowerLeftPosition.x && pos.x <= upperRightPosition.x
@@ -87,24 +86,25 @@ namespace UnitControl
                 ecb.Dispose();
             }
 
-            if (Input.GetMouseButtonDown(1))
+            if (Input.GetMouseButtonUp(1))
             {
                 var mousePosition = MousePositionUtils.MouseToTerrainPositionECS();
                 var selectedEntity = GetEntityQuery(ComponentType.ReadOnly<UnitSelectedComponent>());
-                int count = selectedEntity.CalculateEntityCount() / 2 + 1;
+                int count = selectedEntity.CalculateEntityCount();
                 var movePositionList = GetPositionListAround(mousePosition, 1f, count);
                 int positionIndex = 0;
+
                 Entities
-                   .WithAll<UnitSelectedComponent>()
-                   .ForEach((Entity entity, ref MoveComponent moveComp, in Translation translation) =>
-                   {
-                       moveComp.TargetPosition = new float3(movePositionList[positionIndex].x,
-                           translation.Value.y,
-                           movePositionList[positionIndex].z);
-                       positionIndex++;
-                       moveComp.IsMoving = true;
-                   }).Run();
-                movePositionList.Dispose();
+                    .WithAll<UnitSelectedComponent>()
+                    .WithAll<MoveComponent>()
+                    .ForEach((Entity entity, ref MoveComponent moveComp, in Translation translation) =>
+                    {
+                        moveComp.TargetPosition = new float3(movePositionList[positionIndex].x,
+                               translation.Value.y,
+                               movePositionList[positionIndex].z);
+                        moveComp.IsMoving = true;
+                        positionIndex++;
+                    }).Run();
             }
         }
 

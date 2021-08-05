@@ -9,9 +9,6 @@ namespace UnitControl
         public static SceneController Instance;
         public Transform SelectionArea;
 
-        public Mesh SelectCircleMesh;
-        public Material SelectCircleMaterial;
-
         private void Awake()
         {
             Instance = this;

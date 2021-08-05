@@ -13,15 +13,16 @@ namespace UnitControl
         {
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
 
-            var controller = SceneController.Instance;
             Entities
                 .WithAll<SelectCircleComponent>()
-                .WithAll<UnitSelectedComponent>()
-                .ForEach((Entity entity) =>
-            {
-                ecb.AddComponent<WorldRenderBounds>(entity);
-                ecb.AddComponent<RenderBounds>(entity);
-            }).Run();
+                .ForEach((Entity entity, in Parent parent) =>
+                {
+                    if (HasComponent<UnitSelectedComponent>(parent.Value))
+                    {
+                        ecb.AddComponent<WorldRenderBounds>(entity);
+                        ecb.AddComponent<RenderBounds>(entity);
+                    }
+                }).Run();
 
             ecb.Playback(EntityManager);
             ecb.Dispose();

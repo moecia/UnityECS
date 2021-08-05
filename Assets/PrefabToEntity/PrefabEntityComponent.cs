@@ -11,7 +11,7 @@ namespace PrefabToEntity
 
     public enum SpawnAxis
     {
-        Y = 0,
-        Z
+        XY,
+        XZ
     }
 }
